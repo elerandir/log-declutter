@@ -23,6 +23,6 @@ jobs:
       # by default; private repos need GitHub Advanced Security). If unavailable, replace
       # this step with OSV-Scanner over a committed Gradle lockfile.
       - name: Dependency review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: moderate
