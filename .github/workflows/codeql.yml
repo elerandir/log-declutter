@@ -1,0 +1,51 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 03:27 UTC.
+    - cron: '27 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload analysis results to the code-scanning dashboard.
+      security-events: write
+      # Required by CodeQL to read the Actions run metadata on private repos.
+      actions: read
+      contents: read
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java-kotlin"

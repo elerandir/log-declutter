@@ -1,0 +1,11 @@
+title = "log-declutter gitleaks configuration"
+
+# Start from gitleaks' built-in rule set.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures contain fake secrets used only to exercise the log filter."
+paths = [
+  '''src/test/.*''',
+]

@@ -1,0 +1,50 @@
+plugins {
+    id 'application'
+}
+
+group = 'com.elerandir'
+version = '0.1.0'
+
+repositories {
+    mavenCentral()
+}
+
+// Use the JDK that runs Gradle (JDK 21) rather than a Gradle toolchain.
+// Toolchains can trigger JDK auto-provisioning downloads on restricted networks.
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+def daggerVersion = '2.60'
+def picocliVersion = '4.7.7'
+def lombokVersion = '1.18.46'
+def junitBomVersion = '6.1.1'
+
+dependencies {
+    // Lombok: compile-time boilerplate reduction (no runtime dependency).
+    compileOnly "org.projectlombok:lombok:${lombokVersion}"
+    annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+    // Dagger: compile-time dependency injection (no reflection).
+    implementation "com.google.dagger:dagger:${daggerVersion}"
+    annotationProcessor "com.google.dagger:dagger-compiler:${daggerVersion}"
+
+    // picocli: CLI argument parsing.
+    implementation "info.picocli:picocli:${picocliVersion}"
+    annotationProcessor "info.picocli:picocli-codegen:${picocliVersion}"
+
+    // JUnit 5 (Jupiter) test stack, versions managed by the BOM.
+    testImplementation platform("org.junit:junit-bom:${junitBomVersion}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'com.elerandir.logdeclutter.Main'
+    applicationName = 'log-declutter'
+}
+
+test {
+    useJUnitPlatform()
+}

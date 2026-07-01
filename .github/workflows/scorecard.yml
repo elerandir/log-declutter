@@ -1,0 +1,53 @@
+name: Scorecard supply-chain security
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, Monday 03:37 UTC.
+    - cron: '37 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to upload the results to the code-scanning dashboard.
+      security-events: write
+      # Needed to publish results and get a badge (OIDC token). PUBLIC repos only;
+      # for a PRIVATE repo set publish_results: false and drop this permission.
+      id-token: write
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # PUBLIC repo: publish results so the score badge renders. Set to false if private.
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload to code-scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
