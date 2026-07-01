@@ -16,19 +16,49 @@ left behind, and writes the cleaned result to a new file.
 ## Usage
 
 ```console
-log-declutter <LOG_FILE> <PATTERNS_FILE> [-o <OUTPUT_FILE>]
+log-declutter <LOG_FILE> [PATTERNS_FILE] [--strip-cri] [-s <REGEX>]... [-o <OUTPUT_FILE>]
 ```
 
+For every line the tool: (1) strips any configured leading **prefix**, (2) removes the line
+if it now matches a **pattern** or is **blank**, and (3) writes what remains.
+
 - `LOG_FILE` — the log to clean.
-- `PATTERNS_FILE` — one pattern per line. Each line is a **literal** partial string matched
-  anywhere in a log line (so `DEBUG` removes any line *containing* `DEBUG`). Regex
-  metacharacters such as `.`, `[`, `]`, `(`, `)`, `*`, `$`, and `\` are matched verbatim and
-  need no escaping. Blank lines and lines starting with `#` are ignored, so you can comment
-  your pattern file.
+- `PATTERNS_FILE` *(optional)* — one pattern per line. Each line is a **literal** partial
+  string matched anywhere in a log line (so `DEBUG` removes any line *containing* `DEBUG`).
+  Regex metacharacters such as `.`, `[`, `]`, `(`, `)`, `*`, `$`, and `\` are matched verbatim
+  and need no escaping. Blank lines and lines starting with `#` are ignored, so you can comment
+  your pattern file. Omit this argument to only strip prefixes and drop blank lines.
+- `--strip-cri` — strip the Kubernetes CRI runtime prefix (e.g.
+  `2026-07-01T12:12:58.4378384Z stdout F `) from each line, leaving the payload.
+- `-s, --strip-prefix <REGEX>` — strip the leading match of a custom regex from each line. The
+  regex is anchored at the start of the line (no `^` needed). Repeatable; applied in order.
 - `-o, --output` — where to write the decluttered log. Defaults to the input file name with a
   `.decluttered` suffix (e.g. `app.log` → `app.log.decluttered`).
 
-### Example
+### Example — cleaning up CRI-wrapped JSON logs
+
+`app.log`:
+
+```
+2026-07-01T12:12:58.4378384Z stdout F {"log.level":"INFO","message":"started"}
+2026-07-01T12:12:59.1000000Z stderr F {"log.level":"DEBUG","message":"cache hit"}
+2026-07-01T12:13:00.2000000Z stdout F {"log.level":"WARN","message":"retry"}
+```
+
+Strip the runtime prefix and drop DEBUG lines (`patterns.txt` contains `DEBUG`):
+
+```console
+./gradlew run --args="app.log patterns.txt --strip-cri -o app.clean.log"
+```
+
+`app.clean.log`:
+
+```
+{"log.level":"INFO","message":"started"}
+{"log.level":"WARN","message":"retry"}
+```
+
+### Example — removing noisy lines
 
 `app.log`:
 
@@ -68,13 +98,15 @@ its original order.
 
 ## Options
 
-| Argument / option    | Required | Description                                                                 |
-| -------------------- | -------- | --------------------------------------------------------------------------- |
-| `LOG_FILE`           | yes      | The log file to declutter.                                                  |
-| `PATTERNS_FILE`      | yes      | File of partial-string regex patterns; matching lines are removed.          |
-| `-o`, `--output`     | no       | Output path. Defaults to `<LOG_FILE>.decluttered`.                          |
-| `-h`, `--help`       | no       | Show usage help and exit.                                                   |
-| `-V`, `--version`    | no       | Show version and exit.                                                      |
+| Argument / option        | Required | Description                                                                 |
+| ------------------------ | -------- | --------------------------------------------------------------------------- |
+| `LOG_FILE`               | yes      | The log file to declutter.                                                  |
+| `PATTERNS_FILE`          | no       | File of literal partial strings; lines containing any are removed.          |
+| `--strip-cri`            | no       | Strip the Kubernetes CRI runtime prefix from each line.                     |
+| `-s`, `--strip-prefix`   | no       | Strip a custom leading regex from each line (repeatable, applied in order). |
+| `-o`, `--output`         | no       | Output path. Defaults to `<LOG_FILE>.decluttered`.                          |
+| `-h`, `--help`           | no       | Show usage help and exit.                                                   |
+| `-V`, `--version`        | no       | Show version and exit.                                                      |
 
 ## Build
 

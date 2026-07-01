@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,15 @@ class LogDecluttererTest {
     private DeclutterResult declutter(Path logFile, Path patternsFile, Path outputFile)
             throws IOException {
         DeclutterConfig config = DeclutterConfig.of(logFile, patternsFile, outputFile);
+        return DaggerDeclutterComponent.factory().create(config).declutterer().declutter();
+    }
+
+    /** Builds the real object graph and runs a declutter, also stripping the given prefixes. */
+    private DeclutterResult declutter(
+            Path logFile, Path patternsFile, Path outputFile, List<Pattern> stripPrefixes)
+            throws IOException {
+        DeclutterConfig config =
+                DeclutterConfig.of(logFile, patternsFile, outputFile, stripPrefixes);
         return DaggerDeclutterComponent.factory().create(config).declutterer().declutter();
     }
 
@@ -269,6 +279,98 @@ class LogDecluttererTest {
 
             assertEquals(List.of("INFO clean line"), readLines(output));
             assertEquals(1, result.removedMatching());
+        }
+    }
+
+    @Nested
+    @DisplayName("prefix stripping")
+    class PrefixStripping {
+
+        private final Pattern cri = Pattern.compile(LogDeclutterConstants.CRI_PREFIX_REGEX);
+
+        @Test
+        @DisplayName("given the CRI prefix, when stripping, then only the payload remains and it is counted")
+        void stripsCriPrefix() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "2026-07-01T12:12:58.4378384Z stdout F {\"level\":\"INFO\",\"msg\":\"a\"}",
+                            "2026-07-01T12:12:59.0000000Z stderr F {\"level\":\"WARN\",\"msg\":\"b\"}");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, null, output, List.of(cri));
+
+            assertEquals(
+                    List.of("{\"level\":\"INFO\",\"msg\":\"a\"}", "{\"level\":\"WARN\",\"msg\":\"b\"}"),
+                    readLines(output));
+            assertEquals(2, result.strippedPrefixes());
+            assertEquals(2, result.keptLines());
+        }
+
+        @Test
+        @DisplayName("given a line without the prefix, when stripping, then it is unchanged and not counted")
+        void leavesUnprefixedLinesUntouched() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "2026-07-01T12:12:58.4378384Z stdout F wrapped line",
+                            "already clean line");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, null, output, List.of(cri));
+
+            assertEquals(List.of("wrapped line", "already clean line"), readLines(output));
+            assertEquals(1, result.strippedPrefixes());
+        }
+
+        @Test
+        @DisplayName("given stripping and removal patterns, when running, then patterns match the stripped content")
+        void appliesRemovalPatternsToStrippedContent() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "2026-07-01T12:12:58.4378384Z stdout F DEBUG noisy",
+                            "2026-07-01T12:12:59.0000000Z stdout F INFO keep");
+            Path patterns = writeFile("patterns.txt", "DEBUG");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, patterns, output, List.of(cri));
+
+            assertEquals(List.of("INFO keep"), readLines(output));
+            assertEquals(2, result.strippedPrefixes());
+            assertEquals(1, result.removedMatching());
+        }
+
+        @Test
+        @DisplayName("given a custom prefix regex, when stripping, then its leading match is removed")
+        void stripsCustomPrefix() throws IOException {
+            Path log = writeFile("app.log", "[worker-7] task done", "[worker-7] task queued");
+            // Anchored automatically at line start; no leading '^' needed.
+            Path patterns = null;
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result =
+                    declutter(log, patterns, output, List.of(Pattern.compile("\\[worker-\\d+\\]\\s+")));
+
+            assertEquals(List.of("task done", "task queued"), readLines(output));
+            assertEquals(2, result.strippedPrefixes());
+        }
+
+        @Test
+        @DisplayName("given a line that becomes blank after stripping, when running, then it is dropped")
+        void dropsLinesThatBecomeBlankAfterStripping() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "2026-07-01T12:12:58.4378384Z stdout F ",
+                            "2026-07-01T12:12:59.0000000Z stdout F kept");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, null, output, List.of(cri));
+
+            assertEquals(List.of("kept"), readLines(output));
+            assertEquals(1, result.removedBlank());
+            assertEquals(1, result.keptLines());
         }
     }
 }
