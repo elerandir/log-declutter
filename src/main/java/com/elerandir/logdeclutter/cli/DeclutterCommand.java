@@ -7,7 +7,10 @@ import com.elerandir.logdeclutter.SummaryFormatter;
 import com.elerandir.logdeclutter.model.DeclutterConfig;
 import com.elerandir.logdeclutter.model.DeclutterResult;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.regex.Pattern;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -21,7 +24,8 @@ import picocli.CommandLine.Parameters;
         mixinStandardHelpOptions = true,
         version = LogDeclutterConstants.APP_NAME + " " + LogDeclutterConstants.VERSION,
         description =
-                "Removes log lines containing any of the given partial strings, dropping empty lines.")
+                "Cleans up logs: strips leading prefixes, removes lines containing any given "
+                        + "partial string, and drops empty lines.")
 public class DeclutterCommand implements Callable<Integer> {
 
     @Parameters(
@@ -32,9 +36,11 @@ public class DeclutterCommand implements Callable<Integer> {
 
     @Parameters(
             index = "1",
+            arity = "0..1",
             paramLabel = "PATTERNS_FILE",
             description =
-                    "File of partial strings (one per line); log lines containing any are removed.")
+                    "Optional file of partial strings (one per line); log lines containing any are "
+                            + "removed. Omit to only strip prefixes and drop blank lines.")
     private Path patternsFile;
 
     @Option(
@@ -47,13 +53,41 @@ public class DeclutterCommand implements Callable<Integer> {
                             + "' suffix.")
     private Path outputFile;
 
+    @Option(
+            names = "--strip-cri",
+            description =
+                    "Strip the Kubernetes CRI runtime prefix "
+                            + "(e.g. '2026-07-01T12:12:58.4378384Z stdout F ') from each line.")
+    private boolean stripCri;
+
+    @Option(
+            names = {"-s", "--strip-prefix"},
+            paramLabel = "REGEX",
+            description =
+                    "Regex whose leading match is stripped from each line (anchored at line start; "
+                            + "no '^' needed). Repeatable; applied in order.")
+    private List<String> stripPrefixRegexes = new ArrayList<>();
+
     @Override
     public Integer call() throws Exception {
-        DeclutterConfig config = DeclutterConfig.of(logFile, patternsFile, resolveOutputFile());
+        DeclutterConfig config =
+                DeclutterConfig.of(logFile, patternsFile, resolveOutputFile(), stripPrefixes());
         DeclutterComponent component = DaggerDeclutterComponent.factory().create(config);
         DeclutterResult result = component.declutterer().declutter();
         System.out.println(SummaryFormatter.format(config, result));
         return LogDeclutterConstants.EXIT_SUCCESS;
+    }
+
+    /** Compiles the configured prefixes: the built-in CRI prefix (if requested) then custom ones. */
+    private List<Pattern> stripPrefixes() {
+        List<Pattern> prefixes = new ArrayList<>();
+        if (stripCri) {
+            prefixes.add(Pattern.compile(LogDeclutterConstants.CRI_PREFIX_REGEX));
+        }
+        for (String regex : stripPrefixRegexes) {
+            prefixes.add(Pattern.compile(regex));
+        }
+        return prefixes;
     }
 
     /** Resolves the output path, defaulting alongside the input log when {@code --output} is absent. */

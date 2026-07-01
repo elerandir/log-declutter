@@ -19,12 +19,14 @@ public class SummaryFormatter {
         return String.format(
                 "Decluttered %s%n"
                         + "  total lines read:        %d%n"
+                        + "  prefixes stripped:       %d%n"
                         + "  removed (matched):       %d%n"
                         + "  removed (blank lines):   %d%n"
                         + "  kept:                    %d%n"
                         + "  written to:              %s",
                 config.logFile(),
                 result.totalLines(),
+                result.strippedPrefixes(),
                 result.removedMatching(),
                 result.removedBlank(),
                 result.keptLines(),

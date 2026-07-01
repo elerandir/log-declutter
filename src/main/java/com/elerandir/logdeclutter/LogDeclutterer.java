@@ -13,10 +13,12 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
- * Orchestrates a single declutter run: load patterns, filter the log, and write the result.
+ * Orchestrates a single declutter run: load patterns, strip prefixes, filter the log, and write the
+ * result.
  *
- * <p>Lines are removed when they are blank (so the output never contains empty lines) or when they
- * match a filter pattern. Everything else is preserved in its original order.
+ * <p>Each line first has any configured leading prefix stripped. It is then removed when it is blank
+ * (so the output never contains empty lines) or when it matches a filter pattern. Everything else is
+ * preserved, with its prefix removed, in its original order.
  */
 @Singleton
 public class LogDeclutterer {
@@ -24,12 +26,18 @@ public class LogDeclutterer {
     private final DeclutterConfig config;
     private final PatternLoader patternLoader;
     private final LineFilter lineFilter;
+    private final PrefixStripper prefixStripper;
 
     @Inject
-    public LogDeclutterer(DeclutterConfig config, PatternLoader patternLoader, LineFilter lineFilter) {
+    public LogDeclutterer(
+            DeclutterConfig config,
+            PatternLoader patternLoader,
+            LineFilter lineFilter,
+            PrefixStripper prefixStripper) {
         this.config = config;
         this.patternLoader = patternLoader;
         this.lineFilter = lineFilter;
+        this.prefixStripper = prefixStripper;
     }
 
     /**
@@ -38,16 +46,24 @@ public class LogDeclutterer {
      * @return a summary of the run
      * @throws NoSuchFileException if the log or patterns file does not exist
      * @throws IOException if reading or writing fails
-     * @throws java.util.regex.PatternSyntaxException if the patterns file contains an invalid regex
      */
     public DeclutterResult declutter() throws IOException {
-        FilterPatterns patterns = patternLoader.load(config.patternsFile());
+        FilterPatterns patterns =
+                config.patternsFile() == null
+                        ? FilterPatterns.of(List.of())
+                        : patternLoader.load(config.patternsFile());
         List<String> lines = Files.readAllLines(config.logFile(), StandardCharsets.UTF_8);
 
         List<String> kept = new ArrayList<>(lines.size());
         int removedMatching = 0;
         int removedBlank = 0;
-        for (String line : lines) {
+        int strippedPrefixes = 0;
+        for (String rawLine : lines) {
+            String line = prefixStripper.strip(rawLine, config.stripPrefixes());
+            if (!line.equals(rawLine)) {
+                strippedPrefixes++;
+            }
+
             if (line.isBlank()) {
                 removedBlank++;
             } else if (lineFilter.matches(line, patterns)) {
@@ -58,6 +74,7 @@ public class LogDeclutterer {
         }
 
         Files.write(config.outputFile(), kept, StandardCharsets.UTF_8);
-        return new DeclutterResult(lines.size(), removedMatching, removedBlank, kept.size());
+        return new DeclutterResult(
+                lines.size(), removedMatching, removedBlank, kept.size(), strippedPrefixes);
     }
 }

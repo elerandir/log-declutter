@@ -18,6 +18,14 @@ public class LogDeclutterConstants {
     /** Suffix appended to the source log file name when no explicit output path is given. */
     public final String DEFAULT_OUTPUT_SUFFIX = ".decluttered";
 
+    /**
+     * Prefix added by the Kubernetes CRI log format: an RFC3339Nano timestamp, the stream name
+     * ({@code stdout}/{@code stderr}), and the full/partial tag ({@code F}/{@code P}), e.g.
+     * {@code 2026-07-01T12:12:58.4378384Z stdout F }. Anchored at the start of a line by the
+     * prefix stripper, so no leading {@code ^} is needed.
+     */
+    public final String CRI_PREFIX_REGEX = "\\S+\\s+(?:stdout|stderr)\\s+[FP]\\s+";
+
     /** Process exit code signalling a successful run. */
     public final int EXIT_SUCCESS = 0;
 }
