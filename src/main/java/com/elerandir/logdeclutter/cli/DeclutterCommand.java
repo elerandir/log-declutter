@@ -21,7 +21,7 @@ import picocli.CommandLine.Parameters;
         mixinStandardHelpOptions = true,
         version = LogDeclutterConstants.APP_NAME + " " + LogDeclutterConstants.VERSION,
         description =
-                "Removes log lines matching partial-string regex patterns, dropping empty lines.")
+                "Removes log lines containing any of the given partial strings, dropping empty lines.")
 public class DeclutterCommand implements Callable<Integer> {
 
     @Parameters(
@@ -34,7 +34,7 @@ public class DeclutterCommand implements Callable<Integer> {
             index = "1",
             paramLabel = "PATTERNS_FILE",
             description =
-                    "File of partial-string regex patterns; log lines matching any are removed.")
+                    "File of partial strings (one per line); log lines containing any are removed.")
     private Path patternsFile;
 
     @Option(
