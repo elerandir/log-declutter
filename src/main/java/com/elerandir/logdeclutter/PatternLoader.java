@@ -13,10 +13,12 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
- * Loads partial-string patterns from a file and compiles them into regular expressions.
+ * Loads partial-string patterns from a file and compiles them for literal matching.
  *
- * <p>Blank lines and lines beginning with {@link LogDeclutterConstants#COMMENT_PREFIX} are ignored;
- * every other line is treated as a regex fragment matched against whole log lines.
+ * <p>Blank lines and lines beginning with {@link LogDeclutterConstants#COMMENT_PREFIX} are ignored.
+ * Every other line is treated as a <em>literal</em> substring: it is quoted with {@link
+ * Pattern#quote(String)} so regex metacharacters ({@code . [ ] ( ) * + ? \ } etc.) match verbatim
+ * and never need escaping in the patterns file.
  */
 @Singleton
 public class PatternLoader {
@@ -33,7 +35,6 @@ public class PatternLoader {
      * @return the compiled patterns
      * @throws NoSuchFileException if the patterns file does not exist
      * @throws IOException if the file cannot be read
-     * @throws java.util.regex.PatternSyntaxException if a line is not a valid regular expression
      */
     public FilterPatterns load(Path patternsFile) throws IOException {
         List<String> rawLines = Files.readAllLines(patternsFile, StandardCharsets.UTF_8);
@@ -43,7 +44,8 @@ public class PatternLoader {
             if (pattern.isEmpty() || pattern.startsWith(LogDeclutterConstants.COMMENT_PREFIX)) {
                 continue;
             }
-            patterns.add(Pattern.compile(pattern));
+            // Quote so the line is matched literally; special characters need no escaping.
+            patterns.add(Pattern.compile(Pattern.quote(pattern)));
         }
         return FilterPatterns.of(patterns);
     }

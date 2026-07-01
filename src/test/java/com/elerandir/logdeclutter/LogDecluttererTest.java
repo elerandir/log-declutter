@@ -12,7 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.regex.PatternSyntaxException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -94,22 +93,44 @@ class LogDecluttererTest {
         }
 
         @Test
-        @DisplayName("given patterns as regex fragments, when decluttering, then find() substring semantics apply")
-        void appliesSubstringRegexSemantics() throws IOException {
+        @DisplayName("given a partial string, when decluttering, then any line containing it is removed")
+        void removesLinesContainingPartialString() throws IOException {
             Path log =
                     writeFile(
                             "app.log",
                             "2026-07-01 request id=42 completed",
                             "2026-07-01 healthcheck ping",
                             "2026-07-01 request id=7 failed");
-            // Partial-string regex: matches any line containing 'healthcheck' OR 'id=42'.
-            Path patterns = writeFile("patterns.txt", "healthcheck", "id=4[0-9]");
+            // Partial substrings matched anywhere in a line.
+            Path patterns = writeFile("patterns.txt", "healthcheck", "id=42");
             Path output = workDir.resolve("out.log");
 
             DeclutterResult result = declutter(log, patterns, output);
 
             assertEquals(List.of("2026-07-01 request id=7 failed"), readLines(output));
             assertEquals(2, result.removedMatching());
+        }
+
+        @Test
+        @DisplayName("given regex metacharacters, when decluttering, then they are matched literally, not as regex")
+        void treatsRegexMetacharactersLiterally() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "level=[INFO] service started",
+                            "cost was $5.00 (approx.)",
+                            "regex a.c should not match abc",
+                            "abc is kept");
+            // These lines contain '[', ']', '$', '.', '(', ')', '*' which are regex-special.
+            Path patterns =
+                    writeFile("patterns.txt", "[INFO]", "$5.00 (approx.)", "a.c");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, patterns, output);
+
+            // 'a.c' matches the literal "a.c" line but NOT "abc" (which regex '.' would have matched).
+            assertEquals(List.of("abc is kept"), readLines(output));
+            assertEquals(3, result.removedMatching());
         }
     }
 
@@ -237,13 +258,17 @@ class LogDecluttererTest {
         }
 
         @Test
-        @DisplayName("given an invalid regex, when decluttering, then PatternSyntaxException is thrown")
-        void throwsOnInvalidRegex() throws IOException {
-            Path log = writeFile("app.log", "INFO");
+        @DisplayName("given a would-be-invalid regex, when decluttering, then it is matched literally without error")
+        void treatsInvalidRegexStringAsLiteral() throws IOException {
+            Path log = writeFile("app.log", "INFO [unclosed bracket here", "INFO clean line");
+            // '[unclosed' is not a valid regex, but as a literal pattern it must not throw.
             Path patterns = writeFile("patterns.txt", "[unclosed");
             Path output = workDir.resolve("out.log");
 
-            assertThrows(PatternSyntaxException.class, () -> declutter(log, patterns, output));
+            DeclutterResult result = declutter(log, patterns, output);
+
+            assertEquals(List.of("INFO clean line"), readLines(output));
+            assertEquals(1, result.removedMatching());
         }
     }
 }

@@ -9,9 +9,9 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A small command-line tool that declutters application logs. It reads a log file and a
-patterns file, removes every log line that matches any pattern (each pattern is a
-partial-string regular expression matched anywhere in a line), drops empty lines so no
-blank gaps are left behind, and writes the cleaned result to a new file.
+patterns file, removes every log line that contains any of the patterns (each pattern is a
+literal partial string matched anywhere in a line), drops empty lines so no blank gaps are
+left behind, and writes the cleaned result to a new file.
 
 ## Usage
 
@@ -20,9 +20,11 @@ log-declutter <LOG_FILE> <PATTERNS_FILE> [-o <OUTPUT_FILE>]
 ```
 
 - `LOG_FILE` — the log to clean.
-- `PATTERNS_FILE` — one pattern per line. Each line is a regular expression matched against
-  whole log lines (`find` semantics, so `DEBUG` removes any line *containing* `DEBUG`).
-  Blank lines and lines starting with `#` are ignored, so you can comment your pattern file.
+- `PATTERNS_FILE` — one pattern per line. Each line is a **literal** partial string matched
+  anywhere in a log line (so `DEBUG` removes any line *containing* `DEBUG`). Regex
+  metacharacters such as `.`, `[`, `]`, `(`, `)`, `*`, `$`, and `\` are matched verbatim and
+  need no escaping. Blank lines and lines starting with `#` are ignored, so you can comment
+  your pattern file.
 - `-o, --output` — where to write the decluttered log. Defaults to the input file name with a
   `.decluttered` suffix (e.g. `app.log` → `app.log.decluttered`).
 
