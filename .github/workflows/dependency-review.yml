@@ -17,7 +17,7 @@ jobs:
           egress-policy: audit
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Requires the repository's Dependency graph to be enabled (public repos have it
       # by default; private repos need GitHub Advanced Security). If unavailable, replace
