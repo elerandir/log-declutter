@@ -16,22 +16,29 @@ left behind, and writes the cleaned result to a new file.
 ## Usage
 
 ```console
-log-declutter <LOG_FILE> [PATTERNS_FILE] [--strip-cri] [-s <REGEX>]... [-o <OUTPUT_FILE>]
+log-declutter <LOG_FILE> [PATTERNS_FILE] [--strip-cri] [-s <REGEX>]... [-j] [-o <OUTPUT_FILE>]
 ```
 
-For every line the tool: (1) strips any configured leading **prefix**, (2) removes the line
-if it now matches a **pattern** or is **blank**, and (3) writes what remains.
+For every line the tool: (1) strips any configured leading **prefix**, (2) optionally
+**unwraps JSON** into a classic-style line, (3) removes the line if it now matches a
+**pattern** or is **blank**, and (4) writes what remains.
 
 - `LOG_FILE` — the log to clean.
 - `PATTERNS_FILE` *(optional)* — one pattern per line. Each line is a **literal** partial
   string matched anywhere in a log line (so `DEBUG` removes any line *containing* `DEBUG`).
   Regex metacharacters such as `.`, `[`, `]`, `(`, `)`, `*`, `$`, and `\` are matched verbatim
   and need no escaping. Blank lines and lines starting with `#` are ignored, so you can comment
-  your pattern file. Omit this argument to only strip prefixes and drop blank lines.
+  your pattern file. Omit this argument to only strip/unwrap and drop blank lines.
 - `--strip-cri` — strip the Kubernetes CRI runtime prefix (e.g.
   `2026-07-01T12:12:58.4378384Z stdout F `) from each line, leaving the payload.
 - `-s, --strip-prefix <REGEX>` — strip the leading match of a custom regex from each line. The
   regex is anchored at the start of the line (no `^` needed). Repeatable; applied in order.
+- `-j, --unwrap-json` — convert JSON-object log lines into classic
+  `<timestamp>  <LEVEL> [<thread>] <logger> - <message>` lines (`[thread]` and `<logger>` are
+  included only when present). Common field names are recognised (`@timestamp`/`timestamp`,
+  `log.level`/`level`, `log.logger`/`logger`, `process.thread.name`/`thread`, `message`/`msg`),
+  and nested objects (`{"log":{"level":...}}`) resolve too. Lines that are not JSON objects
+  (plain text, stack traces) pass through unchanged.
 - `-o, --output` — where to write the decluttered log. Defaults to the input file name with a
   `.decluttered` suffix (e.g. `app.log` → `app.log.decluttered`).
 
@@ -40,22 +47,22 @@ if it now matches a **pattern** or is **blank**, and (3) writes what remains.
 `app.log`:
 
 ```
-2026-07-01T12:12:58.4378384Z stdout F {"log.level":"INFO","message":"started"}
-2026-07-01T12:12:59.1000000Z stderr F {"log.level":"DEBUG","message":"cache hit"}
-2026-07-01T12:13:00.2000000Z stdout F {"log.level":"WARN","message":"retry"}
+2026-07-01T12:12:58.4378384Z stdout F {"@timestamp":"2026-07-01T12:12:58.437Z","log.level":"INFO","log.logger":"com.elerandir.App","message":"started"}
+2026-07-01T12:12:59.1000000Z stderr F {"@timestamp":"2026-07-01T12:12:59.100Z","log.level":"DEBUG","message":"cache hit"}
+2026-07-01T12:13:00.2000000Z stdout F {"@timestamp":"2026-07-01T12:13:00.200Z","log.level":"WARN","message":"retry"}
 ```
 
-Strip the runtime prefix and drop DEBUG lines (`patterns.txt` contains `DEBUG`):
+Strip the runtime prefix, unwrap the JSON, and drop DEBUG lines (`patterns.txt` contains `DEBUG`):
 
 ```console
-./gradlew run --args="app.log patterns.txt --strip-cri -o app.clean.log"
+./gradlew run --args="app.log patterns.txt --strip-cri --unwrap-json -o app.clean.log"
 ```
 
 `app.clean.log`:
 
 ```
-{"log.level":"INFO","message":"started"}
-{"log.level":"WARN","message":"retry"}
+2026-07-01T12:12:58.437Z  INFO com.elerandir.App - started
+2026-07-01T12:13:00.200Z  WARN - retry
 ```
 
 ### Example — removing noisy lines
@@ -104,6 +111,7 @@ its original order.
 | `PATTERNS_FILE`          | no       | File of literal partial strings; lines containing any are removed.          |
 | `--strip-cri`            | no       | Strip the Kubernetes CRI runtime prefix from each line.                     |
 | `-s`, `--strip-prefix`   | no       | Strip a custom leading regex from each line (repeatable, applied in order). |
+| `-j`, `--unwrap-json`    | no       | Convert JSON-object lines to classic `TIMESTAMP LEVEL [thread] logger - message`. |
 | `-o`, `--output`         | no       | Output path. Defaults to `<LOG_FILE>.decluttered`.                          |
 | `-h`, `--help`           | no       | Show usage help and exit.                                                   |
 | `-V`, `--version`        | no       | Show version and exit.                                                      |

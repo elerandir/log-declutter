@@ -8,16 +8,23 @@ package com.elerandir.logdeclutter.model;
  * @param removedBlank     blank lines dropped so the output contains no empty lines
  * @param keptLines        lines written to the decluttered output
  * @param strippedPrefixes lines that had a leading prefix removed
+ * @param convertedJson    JSON-object lines converted to classic-style lines
  */
 public record DeclutterResult(
-        int totalLines, int removedMatching, int removedBlank, int keptLines, int strippedPrefixes) {
+        int totalLines,
+        int removedMatching,
+        int removedBlank,
+        int keptLines,
+        int strippedPrefixes,
+        int convertedJson) {
 
     public DeclutterResult {
         if (totalLines < 0
                 || removedMatching < 0
                 || removedBlank < 0
                 || keptLines < 0
-                || strippedPrefixes < 0) {
+                || strippedPrefixes < 0
+                || convertedJson < 0) {
             throw new IllegalArgumentException("line counts must be non-negative");
         }
     }

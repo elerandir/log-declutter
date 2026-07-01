@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
@@ -16,9 +17,10 @@ import javax.inject.Singleton;
  * Orchestrates a single declutter run: load patterns, strip prefixes, filter the log, and write the
  * result.
  *
- * <p>Each line first has any configured leading prefix stripped. It is then removed when it is blank
- * (so the output never contains empty lines) or when it matches a filter pattern. Everything else is
- * preserved, with its prefix removed, in its original order.
+ * <p>Each line first has any configured leading prefix stripped, then (optionally) is unwrapped from
+ * JSON into a classic-style line. It is then removed when it is blank (so the output never contains
+ * empty lines) or when it matches a filter pattern. Everything else is preserved, transformed, in
+ * its original order.
  */
 @Singleton
 public class LogDeclutterer {
@@ -27,17 +29,20 @@ public class LogDeclutterer {
     private final PatternLoader patternLoader;
     private final LineFilter lineFilter;
     private final PrefixStripper prefixStripper;
+    private final JsonLogConverter jsonLogConverter;
 
     @Inject
     public LogDeclutterer(
             DeclutterConfig config,
             PatternLoader patternLoader,
             LineFilter lineFilter,
-            PrefixStripper prefixStripper) {
+            PrefixStripper prefixStripper,
+            JsonLogConverter jsonLogConverter) {
         this.config = config;
         this.patternLoader = patternLoader;
         this.lineFilter = lineFilter;
         this.prefixStripper = prefixStripper;
+        this.jsonLogConverter = jsonLogConverter;
     }
 
     /**
@@ -58,10 +63,19 @@ public class LogDeclutterer {
         int removedMatching = 0;
         int removedBlank = 0;
         int strippedPrefixes = 0;
+        int convertedJson = 0;
         for (String rawLine : lines) {
             String line = prefixStripper.strip(rawLine, config.stripPrefixes());
             if (!line.equals(rawLine)) {
                 strippedPrefixes++;
+            }
+
+            if (config.unwrapJson()) {
+                Optional<String> converted = jsonLogConverter.convert(line);
+                if (converted.isPresent()) {
+                    line = converted.get();
+                    convertedJson++;
+                }
             }
 
             if (line.isBlank()) {
@@ -75,6 +89,7 @@ public class LogDeclutterer {
 
         Files.write(config.outputFile(), kept, StandardCharsets.UTF_8);
         return new DeclutterResult(
-                lines.size(), removedMatching, removedBlank, kept.size(), strippedPrefixes);
+                lines.size(), removedMatching, removedBlank, kept.size(), strippedPrefixes,
+                convertedJson);
     }
 }

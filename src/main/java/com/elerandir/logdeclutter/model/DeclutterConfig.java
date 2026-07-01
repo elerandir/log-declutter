@@ -16,9 +16,14 @@ import java.util.regex.Pattern;
  *                     to remove no lines (blank-line and prefix cleanup still apply)
  * @param outputFile   the destination for the decluttered log
  * @param stripPrefixes ordered prefix patterns; a leading match is stripped from each line
+ * @param unwrapJson   whether to convert JSON-object lines to classic Logback/Spring-style lines
  */
 public record DeclutterConfig(
-        Path logFile, Path patternsFile, Path outputFile, List<Pattern> stripPrefixes) {
+        Path logFile,
+        Path patternsFile,
+        Path outputFile,
+        List<Pattern> stripPrefixes,
+        boolean unwrapJson) {
 
     public DeclutterConfig {
         Objects.requireNonNull(logFile, "logFile");
@@ -27,14 +32,14 @@ public record DeclutterConfig(
         stripPrefixes = List.copyOf(stripPrefixes);
     }
 
-    /** Factory for a run with no prefix stripping. */
+    /** Factory for a run with no prefix stripping and no JSON unwrapping. */
     public static DeclutterConfig of(Path logFile, Path patternsFile, Path outputFile) {
-        return new DeclutterConfig(logFile, patternsFile, outputFile, List.of());
+        return new DeclutterConfig(logFile, patternsFile, outputFile, List.of(), false);
     }
 
     /** Factory for a run that also strips the given leading prefixes from each line. */
     public static DeclutterConfig of(
             Path logFile, Path patternsFile, Path outputFile, List<Pattern> stripPrefixes) {
-        return new DeclutterConfig(logFile, patternsFile, outputFile, stripPrefixes);
+        return new DeclutterConfig(logFile, patternsFile, outputFile, stripPrefixes, false);
     }
 }

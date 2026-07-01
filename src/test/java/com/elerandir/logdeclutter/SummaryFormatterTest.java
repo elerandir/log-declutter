@@ -19,13 +19,14 @@ class SummaryFormatterTest {
                         Path.of("logs/app.log"),
                         Path.of("logs/patterns.txt"),
                         Path.of("logs/app.decluttered.log"));
-        DeclutterResult result = new DeclutterResult(10, 4, 2, 4, 8);
+        DeclutterResult result = new DeclutterResult(10, 4, 2, 4, 8, 6);
 
         String expected =
                 String.format(
                         "Decluttered logs/app.log%n"
                                 + "  total lines read:        10%n"
                                 + "  prefixes stripped:       8%n"
+                                + "  json lines converted:    6%n"
                                 + "  removed (matched):       4%n"
                                 + "  removed (blank lines):   2%n"
                                 + "  kept:                    4%n"

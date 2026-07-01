@@ -24,8 +24,8 @@ import picocli.CommandLine.Parameters;
         mixinStandardHelpOptions = true,
         version = LogDeclutterConstants.APP_NAME + " " + LogDeclutterConstants.VERSION,
         description =
-                "Cleans up logs: strips leading prefixes, removes lines containing any given "
-                        + "partial string, and drops empty lines.")
+                "Cleans up logs: strips leading prefixes, unwraps JSON logs, removes lines "
+                        + "containing any given partial string, and drops empty lines.")
 public class DeclutterCommand implements Callable<Integer> {
 
     @Parameters(
@@ -68,10 +68,18 @@ public class DeclutterCommand implements Callable<Integer> {
                             + "no '^' needed). Repeatable; applied in order.")
     private List<String> stripPrefixRegexes = new ArrayList<>();
 
+    @Option(
+            names = {"-j", "--unwrap-json"},
+            description =
+                    "Convert JSON-object log lines into classic '<timestamp> <LEVEL> [<thread>] "
+                            + "<logger> - <message>' lines. Non-JSON lines pass through unchanged.")
+    private boolean unwrapJson;
+
     @Override
     public Integer call() throws Exception {
         DeclutterConfig config =
-                DeclutterConfig.of(logFile, patternsFile, resolveOutputFile(), stripPrefixes());
+                new DeclutterConfig(
+                        logFile, patternsFile, resolveOutputFile(), stripPrefixes(), unwrapJson);
         DeclutterComponent component = DaggerDeclutterComponent.factory().create(config);
         DeclutterResult result = component.declutterer().declutter();
         System.out.println(SummaryFormatter.format(config, result));

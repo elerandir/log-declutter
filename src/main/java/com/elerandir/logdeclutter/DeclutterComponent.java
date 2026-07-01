@@ -12,7 +12,7 @@ import javax.inject.Singleton;
  * {@code @BindsInstance} parameter, making it injectable into the singleton services.
  */
 @Singleton
-@Component
+@Component(modules = JacksonModule.class)
 public interface DeclutterComponent {
 
     /** The fully wired declutter service. */
