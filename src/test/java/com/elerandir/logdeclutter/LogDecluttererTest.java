@@ -46,6 +46,19 @@ class LogDecluttererTest {
         return DaggerDeclutterComponent.factory().create(config).declutterer().declutter();
     }
 
+    /** Builds the real object graph with full control over prefixes and JSON unwrapping. */
+    private DeclutterResult declutter(
+            Path logFile,
+            Path patternsFile,
+            Path outputFile,
+            List<Pattern> stripPrefixes,
+            boolean unwrapJson)
+            throws IOException {
+        DeclutterConfig config =
+                new DeclutterConfig(logFile, patternsFile, outputFile, stripPrefixes, unwrapJson);
+        return DaggerDeclutterComponent.factory().create(config).declutterer().declutter();
+    }
+
     private Path writeFile(String name, String... lines) throws IOException {
         Path file = workDir.resolve(name);
         Files.write(file, List.of(lines), StandardCharsets.UTF_8);
@@ -371,6 +384,114 @@ class LogDecluttererTest {
             assertEquals(List.of("kept"), readLines(output));
             assertEquals(1, result.removedBlank());
             assertEquals(1, result.keptLines());
+        }
+    }
+
+    @Nested
+    @DisplayName("json unwrapping")
+    class JsonUnwrapping {
+
+        private final Pattern cri = Pattern.compile(LogDeclutterConstants.CRI_PREFIX_REGEX);
+
+        @Test
+        @DisplayName("given minimal ECS json, when unwrapping, then it becomes 'timestamp LEVEL - message'")
+        void unwrapsMinimalJson() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "{\"@timestamp\":\"2026-07-01T12:12:58.437Z\",\"log.level\":\"INFO\",\"message\":\"started\"}");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, null, output, List.of(), true);
+
+            assertEquals(List.of("2026-07-01T12:12:58.437Z  INFO - started"), readLines(output));
+            assertEquals(1, result.convertedJson());
+        }
+
+        @Test
+        @DisplayName("given thread and logger fields, when unwrapping, then they appear as [thread] logger")
+        void unwrapsWithThreadAndLogger() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "{\"@timestamp\":\"2026-07-01T12:12:58.437Z\",\"log.level\":\"INFO\","
+                                    + "\"process.thread.name\":\"main\",\"log.logger\":\"c.e.App\","
+                                    + "\"message\":\"started\"}");
+            Path output = workDir.resolve("out.log");
+
+            declutter(log, null, output, List.of(), true);
+
+            assertEquals(
+                    List.of("2026-07-01T12:12:58.437Z  INFO [main] c.e.App - started"),
+                    readLines(output));
+        }
+
+        @Test
+        @DisplayName("given nested json objects, when unwrapping, then dotted keys still resolve")
+        void unwrapsNestedJson() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "{\"@timestamp\":\"T\",\"log\":{\"level\":\"WARN\",\"logger\":\"svc\"},\"message\":\"careful\"}");
+            Path output = workDir.resolve("out.log");
+
+            declutter(log, null, output, List.of(), true);
+
+            assertEquals(List.of("T  WARN svc - careful"), readLines(output));
+        }
+
+        @Test
+        @DisplayName("given a non-json line, when unwrapping, then it passes through unchanged and is not counted")
+        void passesThroughNonJsonLines() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "{\"@timestamp\":\"T\",\"log.level\":\"ERROR\",\"message\":\"boom\"}",
+                            "\tat com.example.App.main(App.java:42)");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, null, output, List.of(), true);
+
+            // 'ERROR' is 5 chars, so right-padding to width 5 adds no leading space (unlike INFO).
+            assertEquals(
+                    List.of("T ERROR - boom", "\tat com.example.App.main(App.java:42)"),
+                    readLines(output));
+            assertEquals(1, result.convertedJson());
+        }
+
+        @Test
+        @DisplayName("given CRI-wrapped json, when stripping then unwrapping, then both transforms apply")
+        void stripsThenUnwraps() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "2026-07-01T12:12:58.4378384Z stdout F "
+                                    + "{\"@timestamp\":\"T\",\"log.level\":\"INFO\",\"message\":\"hi\"}");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, null, output, List.of(cri), true);
+
+            assertEquals(List.of("T  INFO - hi"), readLines(output));
+            assertEquals(1, result.strippedPrefixes());
+            assertEquals(1, result.convertedJson());
+        }
+
+        @Test
+        @DisplayName("given unwrapping plus a removal pattern, when running, then patterns match the converted line")
+        void removalPatternsMatchConvertedLine() throws IOException {
+            Path log =
+                    writeFile(
+                            "app.log",
+                            "{\"@timestamp\":\"T\",\"log.level\":\"DEBUG\",\"message\":\"noisy\"}",
+                            "{\"@timestamp\":\"T\",\"log.level\":\"INFO\",\"message\":\"keep\"}");
+            Path patterns = writeFile("patterns.txt", "DEBUG");
+            Path output = workDir.resolve("out.log");
+
+            DeclutterResult result = declutter(log, patterns, output, List.of(), true);
+
+            assertEquals(List.of("T  INFO - keep"), readLines(output));
+            assertEquals(1, result.removedMatching());
+            assertEquals(2, result.convertedJson());
         }
     }
 }

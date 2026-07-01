@@ -26,6 +26,12 @@ public class LogDeclutterConstants {
      */
     public final String CRI_PREFIX_REGEX = "\\S+\\s+(?:stdout|stderr)\\s+[FP]\\s+";
 
+    /** Separator between the header and the message in a converted classic-style log line. */
+    public final String CLASSIC_MESSAGE_SEPARATOR = " - ";
+
+    /** Minimum width the level is right-padded to in a converted classic-style log line. */
+    public final int CLASSIC_LEVEL_WIDTH = 5;
+
     /** Process exit code signalling a successful run. */
     public final int EXIT_SUCCESS = 0;
 }

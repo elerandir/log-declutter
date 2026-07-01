@@ -20,6 +20,7 @@ public class SummaryFormatter {
                 "Decluttered %s%n"
                         + "  total lines read:        %d%n"
                         + "  prefixes stripped:       %d%n"
+                        + "  json lines converted:    %d%n"
                         + "  removed (matched):       %d%n"
                         + "  removed (blank lines):   %d%n"
                         + "  kept:                    %d%n"
@@ -27,6 +28,7 @@ public class SummaryFormatter {
                 config.logFile(),
                 result.totalLines(),
                 result.strippedPrefixes(),
+                result.convertedJson(),
                 result.removedMatching(),
                 result.removedBlank(),
                 result.keptLines(),

@@ -19,6 +19,7 @@ java {
 def daggerVersion = '2.60'
 def picocliVersion = '4.7.7'
 def lombokVersion = '1.18.46'
+def jacksonVersion = '2.22.0'
 def junitBomVersion = '6.1.1'
 
 dependencies {
@@ -33,6 +34,9 @@ dependencies {
     // picocli: CLI argument parsing.
     implementation "info.picocli:picocli:${picocliVersion}"
     annotationProcessor "info.picocli:picocli-codegen:${picocliVersion}"
+
+    // Jackson: robust JSON parsing for unwrapping structured logs.
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
 
     // JUnit 5 (Jupiter) test stack, versions managed by the BOM.
     testImplementation platform("org.junit:junit-bom:${junitBomVersion}")
