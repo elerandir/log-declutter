@@ -5,13 +5,13 @@
 [![Secret scan](https://github.com/elerandir/log-declutter/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/elerandir/log-declutter/actions/workflows/gitleaks.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/elerandir/log-declutter/badge)](https://securityscorecards.dev/viewer/?uri=github.com/elerandir/log-declutter)
 [![Java](https://img.shields.io/badge/Java-21-blue.svg)](https://adoptium.net/temurin/releases/?version=21)
-[![Gradle](https://img.shields.io/badge/Gradle-8.14.3-blue.svg)](https://gradle.org/)
+[![Gradle](https://img.shields.io/badge/Gradle-9.6.1-blue.svg)](https://gradle.org/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-A small command-line tool that declutters application logs. It reads a log file and a
-patterns file, removes every log line that contains any of the patterns (each pattern is a
-literal partial string matched anywhere in a line), drops empty lines so no blank gaps are
-left behind, and writes the cleaned result to a new file.
+A small command-line tool that declutters application logs. It can strip noisy leading
+prefixes (e.g. the Kubernetes CRI runtime prefix), drop log lines matching partial strings,
+remove blank lines, and convert structured JSON logs into readable classic-style lines —
+then write the cleaned result to a new file.
 
 ## Usage
 
@@ -19,9 +19,21 @@ left behind, and writes the cleaned result to a new file.
 log-declutter <LOG_FILE> [PATTERNS_FILE] [--strip-cri] [-s <REGEX>]... [-j] [-o <OUTPUT_FILE>]
 ```
 
-For every line the tool: (1) strips any configured leading **prefix**, (2) optionally
-**unwraps JSON** into a classic-style line, (3) removes the line if it now matches a
-**pattern** or is **blank**, and (4) writes what remains.
+### Processing pipeline
+
+Each line flows through these steps, in order:
+
+1. **Strip prefix** — remove any configured leading prefix (`--strip-cri` / `--strip-prefix`).
+2. **Remove** — drop the line if it is blank or matches a removal **pattern**. Matching is done
+   on the stripped line *before* JSON unwrapping, so your patterns match the raw log content
+   (JSON fields and all), regardless of how the survivors are later reformatted.
+3. **Unwrap JSON** — for surviving lines, optionally convert a JSON object into a classic-style
+   line (`--unwrap-json`).
+4. **Write** — emit what remains, in the original order.
+
+> **Note:** if you omit `PATTERNS_FILE`, no removal patterns are loaded and **no lines are
+> removed** — the tool only strips/unwraps and drops blank lines. Pass a patterns file to
+> remove matching lines.
 
 - `LOG_FILE` — the log to clean.
 - `PATTERNS_FILE` *(optional)* — one pattern per line. Each line is a **literal** partial
