@@ -17,10 +17,10 @@ import javax.inject.Singleton;
  * Orchestrates a single declutter run: load patterns, strip prefixes, filter the log, and write the
  * result.
  *
- * <p>Each line first has any configured leading prefix stripped, then (optionally) is unwrapped from
- * JSON into a classic-style line. It is then removed when it is blank (so the output never contains
- * empty lines) or when it matches a filter pattern. Everything else is preserved, transformed, in
- * its original order.
+ * <p>Each line first has any configured leading prefix stripped. Removal (blank line or pattern
+ * match) is then decided against that stripped content, so patterns written against the raw log
+ * (e.g. JSON fields) match regardless of later reformatting. Surviving lines are optionally
+ * unwrapped from JSON into a classic-style line before being written, preserving original order.
  */
 @Singleton
 public class LogDeclutterer {
@@ -70,6 +70,18 @@ public class LogDeclutterer {
                 strippedPrefixes++;
             }
 
+            // Decide removal against the stripped, pre-unwrap content so patterns written against
+            // the raw log (JSON fields and all) still match.
+            if (line.isBlank()) {
+                removedBlank++;
+                continue;
+            }
+            if (lineFilter.matches(line, patterns)) {
+                removedMatching++;
+                continue;
+            }
+
+            // Surviving line: optionally unwrap JSON for the output.
             if (config.unwrapJson()) {
                 Optional<String> converted = jsonLogConverter.convert(line);
                 if (converted.isPresent()) {
@@ -77,14 +89,7 @@ public class LogDeclutterer {
                     convertedJson++;
                 }
             }
-
-            if (line.isBlank()) {
-                removedBlank++;
-            } else if (lineFilter.matches(line, patterns)) {
-                removedMatching++;
-            } else {
-                kept.add(line);
-            }
+            kept.add(line);
         }
 
         Files.write(config.outputFile(), kept, StandardCharsets.UTF_8);
