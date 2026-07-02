@@ -477,21 +477,23 @@ class LogDecluttererTest {
         }
 
         @Test
-        @DisplayName("given unwrapping plus a removal pattern, when running, then patterns match the converted line")
-        void removalPatternsMatchConvertedLine() throws IOException {
+        @DisplayName("given a pattern matching raw JSON structure, when unwrapping, then the line is still removed")
+        void removalIsDecidedBeforeUnwrapping() throws IOException {
             Path log =
                     writeFile(
                             "app.log",
                             "{\"@timestamp\":\"T\",\"log.level\":\"DEBUG\",\"message\":\"noisy\"}",
                             "{\"@timestamp\":\"T\",\"log.level\":\"INFO\",\"message\":\"keep\"}");
-            Path patterns = writeFile("patterns.txt", "DEBUG");
+            // A JSON-structure fragment that only exists BEFORE unwrapping; filtering must run first.
+            Path patterns = writeFile("patterns.txt", "\"log.level\":\"DEBUG\"");
             Path output = workDir.resolve("out.log");
 
             DeclutterResult result = declutter(log, patterns, output, List.of(), true);
 
             assertEquals(List.of("T  INFO - keep"), readLines(output));
             assertEquals(1, result.removedMatching());
-            assertEquals(2, result.convertedJson());
+            // Only the surviving line is unwrapped; the removed line is never converted.
+            assertEquals(1, result.convertedJson());
         }
     }
 }
