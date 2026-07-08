@@ -19,7 +19,7 @@ java {
 def daggerVersion = '2.60'
 def picocliVersion = '4.7.7'
 def lombokVersion = '1.18.46'
-def jacksonVersion = '2.22.0'
+def jacksonVersion = '2.22.1'
 def junitBomVersion = '6.1.1'
 
 dependencies {
